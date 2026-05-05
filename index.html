@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://api.groq.com wss://*.firebaseio.com;">
+  <title>Smart Wallet - إدارة مالية ذكية</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --card: rgba(20, 28, 46, 0.6);
+      --border: rgba(255,255,255,0.08);
+      --accent: #00d9a3;
+      --accent2: #3b82f6;
+    }
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: radial-gradient(ellipse at top, #0f1b2d 0%, #0a0e1a 100%);
+      color: #e8f0fe;
+      min-height: 100vh;
+    }
+    body.light {
+      --bg: #f8fafc;
+      --card: rgba(255, 255, 255, 0.8);
+      --border: rgba(0,0,0,0.08);
+      background: radial-gradient(ellipse at top, #e0f2fe 0%, #f8fafc 100%);
+      color: #0f172a;
+    }
+    .glass {
+      background: var(--card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    .btn-active { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    .btn-active:active { transform: scale(0.96); }
+    .btn-active:hover { transform: translateY(-2px); }
+    .gradient-text { 
+      background: linear-gradient(135deg, var(--accent), var(--accent2)); 
+      -webkit-background-clip: text; 
+      -webkit-text-fill-color: transparent;
+      font-weight: 900;
+    }
+    .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0, 217, 163, 0.1); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    .slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .badge-pro { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .badge-max { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    .modal-backdrop { background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); }
+    input, select { max-width: 100%; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="p-4">
+  <div id="dashboard" class="max-w-7xl mx-auto">
+    <header class="flex flex-wrap justify-between items-center mb-8 slide-up">
+      <div>
+        <h1 class="text-4xl font-black flex items-center gap-3">
+          <span class="gradient-text">Smart Wallet</span>
+          <span id="proBadge" class="hidden text-xs badge-pro px-3 py-1 rounded-full">✨ محترف</span>
+          <span id="maxBadge" class="hidden text-xs badge-max px-3 py-1 rounded-full">💎 النخبة</span>
+        </h1>
+        <p id="welcomeUser" class="text-slate-400 mt-1">أهلاً بيك 👋</p>
+      </div>
+      <div class="flex gap-2 items-center mt-4 md:mt-0 flex-wrap">
+        <button id="settingsBtn" class="glass px-4 py-2 rounded-xl btn-active text-sm">⚙️ الإعدادات</button>
+        <a href="pricing.html" id="upgradeBtn" class="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 rounded-xl font-bold btn-active text-sm">🚀 ترقية الحساب</a>
+        <button id="geminiBtn" class="bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 rounded-xl font-bold btn-active text-sm">🤖 المساعد الذكي</button>
+        <button id="logoutBtn" class="glass px-4 py-2 rounded-xl btn-active text-sm">خروج</button>
+      </div>
+    </header>
+
+    <div id="limitWarning" class="hidden glass p-4 rounded-2xl mb-6 border-2 border-amber-500 slide-up">
+      <p class="font-bold text-amber-400">⚠️ وصلت للحد الأقصى 100 معاملة هذا الشهر</p>
+      <a href="pricing.html" class="text-sm underline hover:text-amber-300">فعّل الحساب المحترف واستمتع بمعاملات غير محدودة</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="glass p-6 rounded-3xl card-hover slide-up">
+        <div class="flex justify-between items-start mb-2">
+          <p class="text-slate-400 text-sm" data-i18n="income">إجمالي الدخل</p>
+          <span class="text-2xl">📈</span>
+        </div>
+        <h2 id="totalIncome" class="text-4xl font-black text-emerald-400">0</h2>
+        <p class="text-xs text-slate-500 mt-1" id="incomeCurrency">ج.م</p>
+      </div>
+      <div class="glass p-6 rounded-3xl card-hover slide-up" style="animation-delay: 0.1s;">
+        <div class="flex justify-between items-start mb-2">
+          <p class="text-slate-400 text-sm" data-i18n="expense">إجمالي المصروف</p>
+          <span class="text-2xl">📉</span>
+        </div>
+        <h2 id="totalExpenses" class="text-4xl font-black text-red-400">0</h2>
+        <p class="text-xs text-slate-500 mt-1" id="expenseCurrency">ج.م</p>
+      </div>
+      <div class="glass p-6 rounded-3xl card-hover slide-up" style="animation-delay: 0.2s;">
+        <div class="flex justify-between items-start mb-2">
+          <p class="text-slate-400 text-sm" data-i18n="balance">الرصيد المتاح</p>
+          <span class="text-2xl">💰</span>
+        </div>
+        <h2 id="currentBalance" class="text-4xl font-black text-sky-400">0</h2>
+        <p class="text-xs text-slate-500 mt-1" id="balanceCurrency">ج.م</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 glass p-6 rounded-3xl slide-up" style="animation-delay: 0.3s;">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold" data-i18n="transactions">سجل المعاملات 📝</h3>
+          <div class="flex gap-2">
+            <button id="exportBtn" class="bg-emerald-600 px-3 py-1.5 rounded-lg text-sm btn-active">📊 Excel</button>
+            <button id="clearAllBtn" class="bg-red-600/80 px-3 py-1.5 rounded-lg text-sm btn-active">🗑️ مسح الكل</button>
+          </div>
+        </div>
+        <div id="transactionsList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+      </div>
+      
+      <div class="glass p-6 rounded-3xl slide-up" style="animation-delay: 0.4s;">
+        <h3 class="text-xl font-bold mb-4" data-i18n="addTransaction">إضافة معاملة جديدة ➕</h3>
+        <input id="amountInput" type="number" min="0" step="0.01" class="w-full bg-slate-800/50 p-3 rounded-xl mb-3 focus:ring-2 focus:ring-emerald-500 transition border border-slate-700" placeholder="المبلغ" maxlength="10">
+        <select id="typeInput" class="w-full bg-slate-800/50 p-3 rounded-xl mb-3 focus:ring-2 focus:ring-emerald-500 transition border border-slate-700">
+          <option value="expense">💸 مصروف</option>
+          <option value="income">💵 دخل</option>
+        </select>
+        <input id="categoryInput" type="text" class="w-full bg-slate-800/50 p-3 rounded-xl mb-3 focus:ring-2 focus:ring-emerald-500 transition border border-slate-700" placeholder="الفئة: أكل، مواصلات..." maxlength="50">
+        <button id="addTransactionBtn" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 py-3 rounded-xl font-bold btn-active">إضافة الآن</button>
+        
+        <div class="mt-6 pt-6 border-t border-slate-700">
+          <h4 class="font-bold mb-2" data-i18n="budget">ميزانية الشهر 🎯</h4>
+          <input id="budgetInput" type="number" min="0" class="w-full bg-slate-800/50 p-3 rounded-xl mb-2 border border-slate-700" placeholder="حدد ميزانيتك" maxlength="10">
+          <button id="saveBudgetBtn" class="w-full bg-sky-600 py-2 rounded-xl text-sm btn-active">حفظ الميزانية</button>
+          <div id="budgetProgress" class="mt-3 hidden">
+            <div class="w-full bg-slate-800 rounded-full h-2">
+              <div id="budgetBar" class="bg-emerald-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-1" id="budgetText"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass p-6 rounded-3xl mt-6 slide-up" style="animation-delay: 0.5s;">
+      <h3 class="text-xl font-bold mb-4" data-i18n="chart">التحليل البصري 📊</h3>
+      <canvas id="expenseChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Modal الإعدادات -->
+  <div id="settingsModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
+    <div class="glass p-8 rounded-3xl max-w-md w-full slide-up">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-black" data-i18n="settings">⚙️ الإعدادات</h2>
+        <button onclick="closeSettings()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="text-sm text-slate-400 mb-2 block">🌍 اللغة</label>
+          <select id="langSelect" class="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+            <option value="ar">🇪🇬 العربية</option>
+            <option value="en">🇺🇸 English</option>
+            <option value="fr">🇫🇷 Français</option>
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="it">🇮🇹 Italiano</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-400 mb-2 block">💱 العملة</label>
+          <select id="currencySelect" class="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+            <option value="EGP">ج.م - جنيه مصري</option>
+            <option value="USD">$ - US Dollar</option>
+            <option value="EUR">€ - Euro</option>
+            <option value="SAR">ر.س - ريال سعودي</option>
+            <option value="AED">د.إ - درهم إماراتي</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-400 mb-2 block">🎨 وضع التطبيق</label>
+          <select id="themeSelect" class="w-full bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+            <option value="dark">🌙 الوضع الليلي</option>
+            <option value="light">☀️ الوضع النهاري</option>
+          </select>
+        </div>
+
+        <button onclick="saveSettings()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 py-3 rounded-xl font-bold btn-active mt-4">حفظ الإعدادات</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

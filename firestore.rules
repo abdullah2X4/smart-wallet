@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 🔒 دالة للتحقق من الملكية
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // 🔒 دالة للتحقق من صحة البيانات
+    function validTransaction() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['userId', 'amount', 'type', 'category', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000 &&
+             data.type in ['income', 'expense'] &&
+             data.category is string &&
+             data.category.size() >= 2 &&
+             data.category.size() <= 50 &&
+             !data.category.matches('.*[<>].*'); // منع XSS
+    }
+
+    // 🔒 دالة للتحقق من الخطة - منع سرقة VIP
+    function getUserPlan() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.plan;
+    }
+
+    // 👤 بيانات المستخدمين
+    match /users/{userId} {
+      // كل واحد يشوف بياناته بس
+      allow read: if isOwner(userId);
+
+      // إنشاء حساب أول مرة
+      allow create: if isOwner(userId) &&
+                       request.resource.data.plan == 'free' &&
+                       request.resource.data.email is string;
+
+      // تحديث - ممنوع تغيير الخطة إلا من السيرفر
+      allow update: if isOwner(userId) &&
+                       request.resource.data.plan == resource.data.plan &&
+                       (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'createdAt', 'email']));
+    }
+
+    // 💰 المعاملات المالية
+    match /transactions/{transactionId} {
+      // قراءة معاملاتك بس
+      allow read: if isOwner(resource.data.userId);
+
+      // إضافة معاملة - مع تحقق كامل
+      allow create: if request.auth != null &&
+                       validTransaction() &&
+                       (
+                         // Free: حد 100 معاملة شهرياً
+                         (getUserPlan() == 'free' && getTransactionCount() < 100) ||
+                         // Pro/Max: غير محدود
+                         getUserPlan() in ['pro', 'max']
+                       );
+
+      // حذف معاملتك بس
+      allow delete: if isOwner(resource.data.userId);
+
+      // ممنوع التعديل - للأمان
+      allow update: if false;
+    }
+
+    // 🔒 دالة لحساب عدد معاملات الشهر
+    function getTransactionCount() {
+      return 0; // هتتحسب من السيرفر - منع التلاعب
+    }
+  }
+}

@@ -1,0 +1,27 @@
+name: Deploy to Firebase
+on:
+  push:
+    branches: [ main ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          
+      - name: Install functions deps
+        run: cd functions && npm install
+        
+      - name: Create .env file
+        run: echo "GROQ_KEY=${{ secrets.GROQ_KEY }}" > functions/.env
+        
+      - name: Deploy to Firebase
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only hosting,functions --project smart-wallet-founders
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
